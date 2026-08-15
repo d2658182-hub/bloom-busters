@@ -47,6 +47,7 @@ class LoadingScreen extends BaseScreen {
     const bar = this.el.querySelector('.loading-fill');
     const text = this.el.querySelector('.loading-text');
     let loaded = 0;
+    let finished = false;
     const total = assets.length || 1;
 
     const setProgress = (pct) => {
@@ -57,9 +58,11 @@ class LoadingScreen extends BaseScreen {
     };
 
     const finishOne = () => {
+      if (finished) return; /* late load events must never re-trigger the transition */
       loaded += 1;
       setProgress((loaded / total) * 100);
       if (loaded >= total) {
+        finished = true;
         if (typeof SDK !== 'undefined') SDK.gameReady();
         this.game.show(this.game.config.loading.loadTarget || 'menu');
       }
@@ -67,7 +70,7 @@ class LoadingScreen extends BaseScreen {
 
     /* watchdog: never let the game hang on a slow/blocked asset */
     setTimeout(() => {
-      if (loaded < total) {
+      if (!finished && loaded < total) {
         for (let i = loaded; i < total; i += 1) finishOne();
       }
     }, 12000);

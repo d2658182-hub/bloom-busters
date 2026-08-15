@@ -14,13 +14,21 @@ class ScreenManager {
   show(name, options = {}) {
     const next = this.screens.get(name);
     if (!next) return;
+    /* idempotent: a repeated show() of the screen already on stage must be a no-op.
+       Otherwise build() appends a second copy that nothing ever destroys -> the
+       screens pile up infinitely (same menu re-rendered forever). */
+    if (next === this.current) return;
     const previous = this.current;
-    if (previous && previous !== next) previous.exit(next);
+    /* synchronous destroy (no rAF deferral): a deferred destroy can fire AFTER the
+       same screen was re-shown and then remove the NEW element, leaving zero screens. */
+    if (previous) {
+      previous.exit(next);
+      previous.destroy();
+    }
     next.build();
     this.container.appendChild(next.el);
     if (typeof UI !== 'undefined') UI.setupLoaded(next.el);
     next.enter(previous, options);
-    if (previous && previous !== next) requestAnimationFrame(() => previous.destroy());
     this.current = next;
   }
 }

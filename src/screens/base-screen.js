@@ -7,6 +7,7 @@ class BaseScreen {
   }
 
   build() {
+    if (this.el) this.el.remove(); /* never leave a stale copy in the DOM */
     this.el = document.createElement('div');
     this.el.className = 'screen';
   }
