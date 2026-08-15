@@ -58,13 +58,53 @@ class GameplayScreen extends BaseScreen {
     return { index: config.worlds.length - 1, ...last };
   }
 
+  /* deterministic per-level RNG: splitmix32-hash of the level, then LCG draws.
+     (plain LCG seeds ramp on consecutive levels; splitmix32 decorrelates them.) */
+  levelRand(level) {
+    let z = (level + 0x9E3779B9) >>> 0;
+    z = Math.imul(z ^ (z >>> 16), 0x21f0aaad);
+    z = Math.imul(z ^ (z >>> 15), 0x735a2d97);
+    z = (z ^ (z >>> 15)) >>> 0;
+    let s = z;
+    return () => {
+      s = (s * 1664525 + 1013904223) >>> 0;
+      return s / 4294967296;
+    };
+  }
+
   buildLevel(level) {
     const config = this.game.config;
     const world = this.worldOf(level);
     const unlocked = config.elements.slice(0, world.unlock);
-    const count = Math.min(config.maxPests, 2 + Math.floor((level - 1) / config.pestStep));
-    const elements = [];
-    for (let i = 0; i < count; i += 1) elements.push(unlocked[i % unlocked.length]);
+    const rand = this.levelRand(level);
+
+    /* pest count: base curve + seeded jitter (-1..+1) so neighbour levels differ */
+    let count = 2 + Math.floor((level - 1) / config.pestStep);
+    if (level > 2) count += Math.floor(rand() * 3) - 1;
+    count = Math.max(2, Math.min(config.maxPests, count));
+
+    /* element multiset: every element of the pool evenly + random remainder,
+       then shuffled — objects and pests share the multiset, so every level
+       is guaranteed solvable (each pest has exactly one matching object). */
+    let pool = unlocked;
+    /* ~30% of levels past world 1 are "focused": a random subset of the
+       unlocked elements, so duplicates dominate — a different feel (fewer
+       options, repetition pressure) instead of always the same full set. */
+    if (level > 40 && rand() < 0.3) {
+      const focusCount = Math.max(2, Math.min(unlocked.length - 1, 3 + Math.floor(rand() * 2)));
+      pool = seededShuffle(unlocked, level * 53 + 11).slice(0, focusCount);
+    }
+    const per = Math.floor(count / pool.length);
+    const base = [];
+    for (let i = 0; i < pool.length; i += 1) {
+      for (let j = 0; j < per; j += 1) base.push(pool[i]);
+    }
+    const extra = seededShuffle(pool, level * 37 + 3);
+    /* compute the number of extras FIRST: the loop condition must not re-evaluate
+       a growing base.length (it would stop early and truncate the level) */
+    const need = count - base.length;
+    for (let i = 0; i < need; i += 1) base.push(extra[i]);
+    const elements = seededShuffle(base, level * 41 + 9);
 
     const objects = elements.map((element, i) => ({
       id: i,
@@ -93,8 +133,9 @@ class GameplayScreen extends BaseScreen {
 
     const oShuffle = seededShuffle(objects, level * 7 + 1);
     const pShuffle = seededShuffle(pests, level * 13 + 5);
-    this.layoutObjects(oShuffle);
-    this.layoutPests(pShuffle);
+    /* one RNG instance per layout so their draws never interfere */
+    this.layoutObjects(oShuffle, this.levelRand(level + 1));
+    this.layoutPests(pShuffle, this.levelRand(level + 2));
 
     return {
       level,
@@ -138,18 +179,18 @@ class GameplayScreen extends BaseScreen {
     return dust;
   }
 
-  layoutObjects(objects) {
-    const perRow = 4;
-    const slot = 150;
+  layoutObjects(objects, rand) {
     const total = objects.length;
+    const perRow = total <= 4 ? 4 : 3 + Math.floor(rand() * 2);
+    const slot = 150;
     const rows = Math.ceil(total / perRow);
     const startY = 150 + (rows - 1) * slot;
     objects.forEach((obj, i) => {
       const row = Math.floor(i / perRow);
       const col = i % perRow;
       const rowCount = Math.min(perRow, total - row * perRow);
-      const x = 360 + (col - (rowCount - 1) / 2) * (slot + 8);
-      const y = startY + row * (slot + 6);
+      const x = 360 + (col - (rowCount - 1) / 2) * (slot + 8) + (rand() - 0.5) * 26;
+      const y = startY + row * (slot + 6) + (rand() - 0.5) * 16;
       obj.slotX = x;
       obj.slotY = y;
       obj.x = x;
@@ -157,18 +198,18 @@ class GameplayScreen extends BaseScreen {
     });
   }
 
-  layoutPests(pests) {
-    const perRow = 4;
-    const slot = 156;
+  layoutPests(pests, rand) {
     const total = pests.length;
+    const perRow = total <= 4 ? 4 : 3 + Math.floor(rand() * 2);
+    const slot = 156;
     const rows = Math.ceil(total / perRow);
-    const startY = total > 4 ? 900 : 1000;
+    const startY = total > 4 ? 860 : 1000;
     pests.forEach((pest, i) => {
       const row = Math.floor(i / perRow);
       const col = i % perRow;
       const rowCount = Math.min(perRow, total - row * perRow);
-      const x = 360 + (col - (rowCount - 1) / 2) * (slot + 10);
-      const y = startY + row * (slot - 34);
+      const x = 360 + (col - (rowCount - 1) / 2) * (slot + 10) + (rand() - 0.5) * 26;
+      const y = startY + row * (slot - 34) + (rand() - 0.5) * 16;
       pest.x = x;
       pest.y = y;
       pest.w = 128;
@@ -413,8 +454,9 @@ class GameplayScreen extends BaseScreen {
       groundOffset: 0,
       dust: this.makeDust()
     };
-    this.layoutObjects(state.objects);
-    this.layoutPests(state.pests);
+    /* re-layout deterministically: same level -> same seeded RNG -> same positions */
+    this.layoutObjects(state.objects, this.levelRand(snap.level + 1));
+    this.layoutPests(state.pests, this.levelRand(snap.level + 2));
     state.objects.forEach((o) => {
       o.wobble = Math.random() * Math.PI * 2;
       o.fallT = 0;
