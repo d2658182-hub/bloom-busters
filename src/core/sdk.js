@@ -24,18 +24,25 @@ const SDK = (() => {
     try { return fn(); } catch (error) { return undefined; }
   };
 
+  /* the bridge script is async, so it can arrive AFTER the game boots:
+     run cb as soon as the bridge is available (or immediately if already so) */
+  const whenBridgeReady = (cb, attempts = 16) => {
+    if (isAvailable()) { cb(); return; }
+    if (attempts <= 0) return;
+    setTimeout(() => whenBridgeReady(cb, attempts - 1), 250);
+  };
+
   return {
     isAvailable,
 
     /* ---- lifecycle ---- */
     gameReady() {
-      if (!isAvailable()) return;
-      safe(() => rawBridge().gameReady());
+      whenBridgeReady(() => safe(() => rawBridge().gameReady()));
     },
 
     loadingProgress(p) {
-      if (!isAvailable()) return;
-      safe(() => rawBridge().loadingProgress(Math.max(0, Math.min(1, p))));
+      const value = Math.max(0, Math.min(1, p));
+      whenBridgeReady(() => safe(() => rawBridge().loadingProgress(value)));
     },
 
     gameplayStart() { if (isAvailable()) safe(() => rawBridge().gameplay.start()); },

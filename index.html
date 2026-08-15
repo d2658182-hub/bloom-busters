@@ -9,8 +9,9 @@
 <body>
 <div id="game-root"></div>
 
-<!-- Playgama bridge MUST be loaded before the game scripts -->
-<script src="https://bridge.playgama.com/v2/stable/playgama-bridge.js"></script>
+<!-- Playgama bridge: loaded async so a slow/blocked bridge host never
+     blocks first paint; the SDK wrapper picks it up whenever it arrives -->
+<script async src="https://bridge.playgama.com/v2/stable/playgama-bridge.js"></script>
 
 <script src="game-config.js"></script>
 <script src="src/core/sdk.js"></script>

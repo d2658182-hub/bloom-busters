@@ -48,7 +48,12 @@ class LoadingScreen extends BaseScreen {
     const text = this.el.querySelector('.loading-text');
     let loaded = 0;
     let finished = false;
-    const total = assets.length || 1;
+
+    /* only IMAGES block the menu — they render every screen. Audio (large
+       .ogg files) preloads in the background: it must never delay the
+       transition, or a slow connection shows the menu with blank sprites. */
+    const imgs = assets.filter((src) => !/\.(ogg|mp3|wav)$/.test(src));
+    const total = imgs.length || 1;
 
     const setProgress = (pct) => {
       const value = Math.max(0, Math.min(100, pct));
@@ -68,27 +73,28 @@ class LoadingScreen extends BaseScreen {
       }
     };
 
-    /* watchdog: never let the game hang on a slow/blocked asset */
+    /* watchdog: never let the game hang on a slow/blocked image */
     setTimeout(() => {
       if (!finished && loaded < total) {
         for (let i = loaded; i < total; i += 1) finishOne();
       }
-    }, 12000);
+    }, 25000);
 
     setProgress(0);
-    assets.forEach((src) => {
-      if (/\.(ogg|mp3|wav)$/.test(src)) {
-        const audio = new Audio();
-        audio.preload = 'auto';
-        audio.oncanplaythrough = finishOne;
-        audio.onerror = finishOne;
-        audio.src = src;
-        audio.load();
-        return;
-      }
+    imgs.forEach((src) => {
       const img = new Image();
       img.onload = img.onerror = finishOne;
       img.src = src;
+    });
+
+    /* audio: fire-and-forget background preload (the AudioEngine owns playback) */
+    assets.filter((src) => /\.(ogg|mp3|wav)$/.test(src)).forEach((src) => {
+      try {
+        const audio = new Audio();
+        audio.preload = 'auto';
+        audio.src = src;
+        audio.load();
+      } catch (error) { /* noop */ }
     });
   }
 }
