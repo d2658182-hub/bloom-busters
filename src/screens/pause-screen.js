@@ -37,21 +37,26 @@ class PauseScreen extends BaseScreen {
 
   enter() {
     if (typeof SDK !== 'undefined') SDK.gameplayPause();
-    this.game.audio.stopMusic();
+    /* duck the music (soft, still playing) instead of cutting it: no
+       jarring stop/restart when resuming */
+    this.game.audio.setDuck(0.14);
   }
 
   resume() {
     this.game.audio.click();
+    this.game.audio.setDuck(0);
     this.game.show('gameplay', { keep: true, resume: true });
   }
 
   restart() {
     this.game.audio.click();
+    this.game.audio.setDuck(0);
     this.game.show('gameplay');
   }
 
   quit() {
     this.game.audio.click();
+    this.game.audio.setDuck(0);
     this.game.show('menu');
   }
 }

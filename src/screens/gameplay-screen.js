@@ -330,11 +330,15 @@ class GameplayScreen extends BaseScreen {
     this.updateHud();
   }
 
-  exit() {
+  exit(next) {
     cancelAnimationFrame(this.frameId);
     this.frameId = null;
     if (typeof SDK !== 'undefined') SDK.gameplayPause();
-    this.game.audio.stopMusic();
+    /* going to the pause screen: keep the music playing (it gets ducked
+       by PauseScreen.enter) so resuming never cuts/restarts it */
+    if (!next || next.name !== 'pause') {
+      this.game.audio.stopMusic();
+    }
     if (this.bannerTimer) {
       clearTimeout(this.bannerTimer);
       this.bannerTimer = null;

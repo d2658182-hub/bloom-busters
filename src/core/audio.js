@@ -29,9 +29,49 @@ class AudioEngine {
       window.addEventListener('beforeunload', offAudio, { once: true });
     }
 
+    /* never keep playing when the tab/browser is hidden or closed */
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        this.pauseMusic();
+        this.duck(0);
+      } else {
+        this.duck(this.duckLevel);
+        if (this.pausedMusic) this.resumeMusic();
+      }
+    });
+    window.addEventListener('pagehide', () => {
+      this.pauseMusic();
+      this.duck(0);
+    });
+    window.addEventListener('pageshow', () => {
+      if (!document.hidden) this.duck(this.duckLevel);
+    });
+
     window.addEventListener('pointerdown', () => this.unlock(), { once: true });
     window.addEventListener('keydown', () => this.unlock(), { once: true });
     window.addEventListener('touchstart', () => this.unlock(), { once: true });
+  }
+
+  /* comfortable loudness: everything is capped well below 1.0 */
+  musicVolume() { return 0.32; }
+  sfxVolume() { return 0.38; }
+
+  /* ducking: music plays softly (pause screen / tab hidden) instead of
+     stopping and restarting from the top — no jarring cut/resume.
+     duckLevel = 0 means "no ducking": the track plays at musicVolume(). */
+  duckLevel = 0;
+  duck(level) {
+    Object.keys(this.tracks).forEach((name) => {
+      try { this.tracks[name].volume = level; } catch (error) { /* noop */ }
+    });
+  }
+
+  /* apply the current volume policy to the playing track */
+  applyMusicVolume() {
+    if (!this.currentMusic) return;
+    const track = this.tracks[this.currentMusic];
+    if (!track) return;
+    try { track.volume = this.duckLevel > 0 ? this.duckLevel : this.musicVolume(); } catch (error) { /* noop */ }
   }
 
   /* create all elements (called by the loading screen after files are known) */
@@ -51,6 +91,7 @@ class AudioEngine {
     el.src = src;
     el.loop = !!loop;
     el.preload = 'auto';
+    el.volume = loop ? this.musicVolume() : this.sfxVolume();
     el.setAttribute('playsinline', '');
     return el;
   }
@@ -73,8 +114,15 @@ class AudioEngine {
     if (this.muted) { this.pendingMusic = name; return; }
     const track = this.tracks[name];
     if (!track) return;
+    /* already playing the same track (e.g. resuming after pause): keep the
+       position and just re-apply the volume — no jarring cut/restart */
+    if (this.currentMusic === name && !track.paused) {
+      this.applyMusicVolume();
+      return;
+    }
     this.stopMusic();
     this.currentMusic = name;
+    this.applyMusicVolume();
     if (!this.unlocked) { this.pendingMusic = name; return; }
     try {
       const p = track.play();
@@ -90,6 +138,33 @@ class AudioEngine {
     });
     this.currentMusic = null;
     this.pendingMusic = null;
+  }
+
+  /* soft-pause: keep the position, silence the track (tab hidden / quit) */
+  pauseMusic() {
+    if (this.currentMusic && this.tracks[this.currentMusic]) {
+      this.pausedMusic = this.currentMusic;
+      try { this.tracks[this.currentMusic].pause(); } catch (error) { /* noop */ }
+    }
+  }
+
+  resumeMusic() {
+    const name = this.pausedMusic;
+    this.pausedMusic = null;
+    if (!name || this.muted) return;
+    const track = this.tracks[name];
+    if (!track) return;
+    this.applyMusicVolume();
+    try {
+      const p = track.play();
+      if (p && p.catch) p.catch(() => {});
+    } catch (error) { /* noop */ }
+  }
+
+  /* ---- pause-screen ducking (soft music instead of cut+restart) ---- */
+  setDuck(level) {
+    this.duckLevel = level;
+    this.applyMusicVolume();
   }
 
   /* ---- sfx ---- */
