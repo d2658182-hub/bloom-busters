@@ -350,18 +350,15 @@ class GameplayScreen extends BaseScreen {
 
   /* ---------------- SDK + end-of-run ---------------- */
 
-  async endRun(won) {
+  endRun(won) {
     const state = this.state;
     state.phase = won ? 'won' : 'lost';
 
+    /* interstitial cadence: every 2nd consecutive run. It must NEVER delay the
+       end screen — the ad plays when the player starts the next run instead. */
     const streak = this.game.pushStreak(won ? 'win' : 'loss');
-    if (typeof SDK !== 'undefined' && SDK.isAvailable() && streak >= 2 && streak % 2 === 0) {
-      /* freeze gameplay during the fullscreen ad */
-      cancelAnimationFrame(this.frameId);
-      this.frameId = null;
-      await SDK.showInterstitial();
-      this.game.resetStreak();
-    }
+    const adNext = typeof SDK !== 'undefined' && SDK.isAvailable() && streak >= 2 && streak % 2 === 0;
+    if (adNext) this.game.resetStreak();
 
     const data = {
       level: state.level,
@@ -369,7 +366,8 @@ class GameplayScreen extends BaseScreen {
       combo: state.maxCombo,
       coins: won ? this.winCoins() : this.game.config.economy.lossConsolation,
       stars: won ? this.computeStars() : 0,
-      pestCount: state.pests.length
+      pestCount: state.pests.length,
+      adNext
     };
     this.game.addCoins(data.coins);
     if (won) this.game.setLevel(state.level + 1);
@@ -659,7 +657,7 @@ class GameplayScreen extends BaseScreen {
         if (state.pests.every((p) => !p.alive)) {
           this.endRun(true);
         }
-      }, 320);
+      }, 220);
     } else {
       const pest = t.pest;
       pest.state = 'wrong';
@@ -673,7 +671,7 @@ class GameplayScreen extends BaseScreen {
       this.game.audio.wrong();
       setTimeout(() => {
         this.endRun(false);
-      }, 650);
+      }, 420);
     }
   }
 

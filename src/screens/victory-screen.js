@@ -177,8 +177,13 @@ class VictoryScreen extends BaseScreen {
     this.confettiFrame = requestAnimationFrame(step);
   }
 
-  nextLevel() {
+  async nextLevel() {
     this.game.audio.click();
+    /* deferred interstitial (decided in endRun): plays on the way to the
+       next level, never while the victory screen is appearing */
+    if (typeof SDK !== 'undefined' && SDK.isAvailable() && this.lastData && this.lastData.adNext) {
+      await SDK.showInterstitial();
+    }
     this.game.show(this.game.config.playTarget || 'gameplay');
   }
 

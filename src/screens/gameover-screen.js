@@ -83,8 +83,14 @@ class GameOverScreen extends BaseScreen {
     this.game.audio.playMusic('gameover');
   }
 
-  retry() {
+  async retry() {
     this.game.audio.click();
+    /* deferred interstitial (decided in endRun): plays on the way to the
+       next run, never while the game over screen is appearing */
+    if (typeof SDK !== 'undefined' && SDK.isAvailable()
+        && this.lastOptions && this.lastOptions.data && this.lastOptions.data.adNext) {
+      await SDK.showInterstitial();
+    }
     this.game.show(this.game.config.playTarget || 'gameplay');
   }
 
