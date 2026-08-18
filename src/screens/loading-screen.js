@@ -83,7 +83,15 @@ class LoadingScreen extends BaseScreen {
     setProgress(0);
     imgs.forEach((src) => {
       const img = new Image();
-      img.onload = img.onerror = finishOne;
+      img.onload = img.onerror = () => {
+        /* store preloaded image in the global cache so gameplay reuses it
+           instead of creating a new Image() and re-decoding from disk */
+        if (img.complete && img.naturalWidth > 0) {
+          window.IMG = window.IMG || {};
+          window.IMG[src] = img;
+        }
+        finishOne();
+      };
       img.src = src;
     });
 

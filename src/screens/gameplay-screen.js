@@ -9,8 +9,8 @@
    Canvas logical space: 720x1280 (9:16), scaled by CSS.
    ============================================================ */
 
-/* ---- shared image cache (images preloaded by the loading screen) ---- */
-const IMG = {};
+/* ---- shared image cache (populated by the loading screen, reused here) ---- */
+const IMG = (window.IMG = window.IMG || {});
 function sprite(src) {
   if (!IMG[src]) {
     const img = new Image();
