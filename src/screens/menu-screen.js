@@ -16,6 +16,7 @@ class MenuScreen extends BaseScreen {
           <div class="menu-subtitle">Magic Garden Match</div>
         </div>
         <div class="menu-progress"></div>
+        <div class="menu-worlds"></div>
         <div class="menu-buttons">
           ${this.playButton()}
           ${config.features.shop ? this.shopButton() : ''}
@@ -77,11 +78,37 @@ class MenuScreen extends BaseScreen {
     box.innerHTML = `
       <div class="progress-chip">World: <b>${world.name}</b></div>
       <div class="progress-chip">Level <b>${level}</b></div>
+      <div class="progress-chip">★ <b>${this.game.getTotalStars()}</b></div>
       <div class="progress-chip coins-chip">
         <img src="assets/ui/c.png" alt="" draggable="false">
         <span>${coins.toLocaleString('en-US')}</span>
       </div>
     `;
+    this.updateWorlds();
+  }
+
+  /* world strip: name + stars earned, current world highlighted */
+  updateWorlds() {
+    const box = this.el.querySelector('.menu-worlds');
+    if (!box) return;
+    const config = this.game.config;
+    const current = this.worldOf(this.game.getLevel());
+    const starsMap = this.game.getStarsMap();
+    let acc = 0;
+    let html = '';
+    config.worlds.forEach((world) => {
+      let worldStars = 0;
+      for (let i = acc + 1; i <= acc + world.levels; i += 1) worldStars += Number(starsMap[i]) || 0;
+      acc += world.levels;
+      const active = world.name === current.name ? ' active' : '';
+      html += `
+        <div class="world-chip${active}" title="${world.name}">
+          <span class="world-dot">${world.families.length > 1 ? '✦' : '●'}</span>
+          <span class="world-stars">★ ${worldStars}</span>
+        </div>
+      `;
+    });
+    box.innerHTML = html;
   }
 
   worldOf(level) {

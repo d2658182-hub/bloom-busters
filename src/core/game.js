@@ -53,6 +53,29 @@ class Game {
     return true;
   }
 
+  /* stars per level: { level: bestStars } */
+  getStarsMap() {
+    const map = this.storage.get('stars', {});
+    return map && typeof map === 'object' ? map : {};
+  }
+
+  getStars(level) {
+    return Number(this.getStarsMap()[level]) || 0;
+  }
+
+  setStars(level, stars) {
+    const map = this.getStarsMap();
+    if ((map[level] || 0) < stars) {
+      map[level] = stars;
+      this.storage.set('stars', map);
+    }
+  }
+
+  getTotalStars() {
+    const map = this.getStarsMap();
+    return Object.keys(map).reduce((sum, level) => sum + (Number(map[level]) || 0), 0);
+  }
+
   getItems() {
     return this.storage.get('items', []);
   }

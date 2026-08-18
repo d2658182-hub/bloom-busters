@@ -48,7 +48,7 @@ class Storage {
   pullFromCloud() {
     if (this.cloudLoaded || typeof SDK === 'undefined' || !SDK.isAvailable()) return;
     this.cloudLoaded = true;
-    const keys = ['coins', 'level', 'items', 'settings', 'streak', 'runStats', 'hintsUsed', 'reviveUsed', 'bestCombo'];
+    const keys = ['coins', 'level', 'items', 'settings', 'streak', 'runStats', 'hintsUsed', 'reviveUsed', 'bestCombo', 'stars'];
     keys.forEach((key) => {
       SDK.storageGet(this.key(key)).then((raw) => {
         if (raw == null || raw === '') return;
