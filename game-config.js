@@ -28,6 +28,8 @@ const GAME_CONFIG = {
       'assets/game/badge-water.png', 'assets/game/badge-light.png',
       'assets/game/badge-fire.png',  'assets/game/badge-wind.png',
       'assets/game/badge-earth.png', 'assets/game/badge-frost.png',
+      /* tutorial hand */
+      'assets/ui/tutorial-hand.png',
       /* shop icons */
       'assets/game/shop-bloom-bonus.png',
       'assets/game/shop-double.png',

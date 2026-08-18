@@ -234,7 +234,8 @@ class GameplayScreen extends BaseScreen {
       shake: 0, flash: 0, time: 0,
       particles: [], popups: [],
       cloudOffsetA: 0, cloudOffsetB: 0, groundOffset: 0,
-      dust: this.makeDust()
+      dust: this.makeDust(),
+      tutorial: null
     };
   }
 
@@ -484,6 +485,12 @@ class GameplayScreen extends BaseScreen {
     if (this.state.newLevel) {
       this.showBanner(this.state.level, this.state.world, this.state.objective);
       this.state.newLevel = false;
+      /* start visual tutorial on first level of each world */
+      const tutInfo = this.shouldTutorial(this.state.level);
+      if (tutInfo && !this.game.storage.get('tutorialDone_' + this.state.level)) {
+        this.startTutorial(this.state.level, this.state.world);
+        this.game.storage.set('tutorialDone_' + this.state.level, true);
+      }
     }
 
     if (typeof SDK !== 'undefined') {
@@ -682,6 +689,155 @@ class GameplayScreen extends BaseScreen {
     if (level % 10 === 0) this.game.audio.milestone();
   }
 
+  /* ---------------- visual tutorial ---------------- */
+
+  /* First level of each world (1, 41, 81, 121, 161) gets a tutorial */
+  shouldTutorial(level) {
+    const config = this.game.config;
+    let acc = 0;
+    for (let i = 0; i < config.worlds.length; i += 1) {
+      if (level === acc + 1) return { full: i === 0, worldIndex: i };
+      acc += config.worlds[i].levels;
+    }
+    return null;
+  }
+
+  startTutorial(level, world) {
+    const state = this.state;
+    const objects = state.objects.filter((o) => o.state === 'idle');
+    const pests = state.pests.filter((p) => p.alive);
+    if (objects.length < 2 || pests.length < 2) { state.tutorial = null; return; }
+
+    /* find the first pair that matches (correct drop) and one that doesn't */
+    let correctObj = null, correctPest = null, wrongObj = null, wrongPest = null;
+    for (let i = 0; i < objects.length; i += 1) {
+      for (let j = 0; j < pests.length; j += 1) {
+        if (this.matches(objects[i], pests[j])) {
+          if (!correctObj) { correctObj = objects[i]; correctPest = pests[j]; }
+        } else {
+          if (!wrongObj) { wrongObj = objects[i]; wrongPest = pests[j]; }
+        }
+      }
+    }
+    if (!correctObj || !wrongObj) { state.tutorial = null; return; }
+
+    const isFull = world.index === 0;
+    state.tutorial = {
+      phase: isFull ? 'point-correct' : 'point-new',
+      timer: 0,
+      handX: correctObj.x,
+      handY: correctObj.y - 80,
+      targetObj: correctObj,
+      targetPest: correctPest,
+      wrongObj: wrongObj,
+      wrongPest: wrongPest,
+      handImg: sprite('assets/ui/tutorial-hand.png'),
+      isFull
+    };
+    this.hud.style.display = 'none';
+    this.objectiveStrip.style.display = 'none';
+  }
+
+  updateTutorial(dt) {
+    const tut = this.state.tutorial;
+    if (!tut) return false;
+    const obj = tut.targetObj;
+    const pest = tut.targetPest;
+    const wObj = tut.wrongObj;
+    const wPest = tut.wrongPest;
+    tut.timer += dt;
+
+    if (tut.phase === 'point-correct') {
+      /* hand hovers above the correct object, bobbing */
+      tut.handX = obj.x;
+      tut.handY = obj.y - 80 + Math.sin(tut.timer * 3) * 8;
+      if (tut.timer > 1.8) { tut.phase = 'drag-correct'; tut.timer = 0; }
+    } else if (tut.phase === 'drag-correct') {
+      /* hand drags the object down to the matching pest */
+      const t = Math.min(1, tut.timer / 0.8);
+      const ease = 1 - Math.pow(1 - t, 3);
+      tut.handX = obj.x + (pest.x - obj.x) * ease;
+      tut.handY = (obj.y - 80) + (pest.y - obj.y - 80) * ease + Math.sin(tut.timer * 4) * 3;
+      obj.x = tut.handX;
+      obj.y = tut.handY + 80;
+      obj.state = 'dragging';
+      if (t >= 1) {
+        /* trigger the correct drop */
+        this.resolveDrop(obj, pest);
+        tut.phase = 'show-explode';
+        tut.timer = 0;
+      }
+    } else if (tut.phase === 'show-explode') {
+      /* wait for explosion to play, then show the hand on wrong pair */
+      if (tut.timer > 1.0) {
+        if (!tut.isFull) {
+          /* mini-tutorial: just show the hand pointing at new piece, then done */
+          tut.phase = 'done';
+          tut.timer = 0;
+        } else {
+          tut.phase = 'point-wrong';
+          tut.timer = 0;
+        }
+      }
+    } else if (tut.phase === 'point-wrong') {
+      /* hand hovers above a wrong object */
+      tut.handX = wObj.x;
+      tut.handY = wObj.y - 80 + Math.sin(tut.timer * 3) * 8;
+      if (tut.timer > 1.8) { tut.phase = 'drag-wrong'; tut.timer = 0; }
+    } else if (tut.phase === 'drag-wrong') {
+      /* hand drags to a WRONG pest */
+      const t = Math.min(1, tut.timer / 0.8);
+      const ease = 1 - Math.pow(1 - t, 3);
+      tut.handX = wObj.x + (wPest.x - wObj.x) * ease;
+      tut.handY = (wObj.y - 80) + (wPest.y - wObj.y - 80) * ease + Math.sin(tut.timer * 4) * 3;
+      wObj.x = tut.handX;
+      wObj.y = tut.handY + 80;
+      wObj.state = 'dragging';
+      if (t >= 1) {
+        this.resolveDrop(wObj, wPest);
+        tut.phase = 'show-wrong';
+        tut.timer = 0;
+      }
+    } else if (tut.phase === 'show-wrong') {
+      if (tut.timer > 1.2) { tut.phase = 'done'; tut.timer = 0; }
+    } else if (tut.phase === 'done') {
+      /* fade out hand */
+      tut.timer += dt;
+      if (tut.timer > 0.5) {
+        this.state.tutorial = null;
+        this.hud.style.display = '';
+        this.objectiveStrip.style.display = '';
+        this.updateHud();
+        return false;
+      }
+    }
+    return true; /* tutorial still active */
+  }
+
+  renderTutorial(ctx) {
+    const tut = this.state && this.state.tutorial;
+    if (!tut || !tut.handImg || !tut.handImg.complete || tut.handImg.naturalWidth === 0) return;
+    const alpha = tut.phase === 'done' ? Math.max(0, 1 - tut.timer * 2) : 1;
+    const bob = tut.phase.startsWith('point') ? Math.sin(tut.timer * 3) * 8 : 0;
+    const x = tut.handX;
+    const y = tut.handY + bob;
+    const w = 90, h = 90;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.drawImage(tut.handImg, x - w / 2, y - h / 2, w, h);
+    /* pulse ring around the hand when pointing */
+    if (tut.phase.startsWith('point')) {
+      const pulse = 0.5 + 0.5 * Math.sin(tut.timer * 4);
+      ctx.globalAlpha = alpha * 0.3 * pulse;
+      ctx.beginPath();
+      ctx.arc(x, y, 50 + pulse * 10, 0, Math.PI * 2);
+      ctx.strokeStyle = '#ffd75e';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
   updateHud() {
     const state = this.state;
     if (!state) return;
@@ -828,7 +984,7 @@ class GameplayScreen extends BaseScreen {
   }
 
   onPointerDown(event) {
-    if (!this.state || this.state.phase !== 'play') return;
+    if (!this.state || this.state.phase !== 'play' || this.state.tutorial) return;
     const { x, y } = this.toLocal(event);
     const obj = this.hitObject(x, y);
     if (obj) {
@@ -1160,6 +1316,22 @@ class GameplayScreen extends BaseScreen {
     if (!state) return;
     state.time += dt;
 
+    /* tutorial mode: only update tutorial + ambient, skip game logic */
+    if (state.tutorial) {
+      this.updateTutorial(dt);
+      state.cloudOffsetA = (state.cloudOffsetA - 6 * dt) % 1440;
+      state.cloudOffsetB = (state.cloudOffsetB + 10 * dt) % 1440;
+      state.groundOffset = (state.groundOffset - 22 * dt) % 205;
+      state.objects.forEach((o) => { o.wobble += dt * 3; });
+      state.pests.forEach((p) => { p.wobble += dt * 2; });
+      state.particles = state.particles.filter((p) => {
+        p.life -= dt; if (p.life <= 0) return false;
+        p.vy += p.grav * dt; p.x += p.vx * dt; p.y += p.vy * dt;
+        p.rot += p.vr * dt; return true;
+      });
+      return;
+    }
+
     /* ambient */
     state.cloudOffsetA = (state.cloudOffsetA - 6 * dt) % 1440;
     state.cloudOffsetB = (state.cloudOffsetB + 10 * dt) % 1440;
@@ -1339,6 +1511,9 @@ class GameplayScreen extends BaseScreen {
     ctx.restore();
 
     ctx.restore();
+
+    /* tutorial hand overlay */
+    this.renderTutorial(ctx);
 
     /* red flash on wrong */
     if (state.flash > 0) {
