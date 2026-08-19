@@ -64,7 +64,7 @@ class MenuScreen extends BaseScreen {
   }
 
   enter() {
-    if (typeof SDK !== 'undefined') SDK.gameplayStop();
+    if (typeof SDK !== 'undefined') SDK.levelMessage('game_ready');
     this.game.audio.playMusic('menu');
     this.updateProgress();
   }

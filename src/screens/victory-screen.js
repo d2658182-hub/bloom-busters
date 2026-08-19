@@ -101,8 +101,7 @@ class VictoryScreen extends BaseScreen {
       img.src = i < data.stars ? 'assets/ui/s1.png' : 'assets/ui/s2.png';
     });
 
-    const canDouble = typeof SDK !== 'undefined' && SDK.isAvailable();
-    if (this.doubleButton) this.doubleButton.el.style.display = canDouble ? '' : 'none';
+    if (this.doubleButton) this.doubleButton.el.style.display = typeof SDK !== 'undefined' ? '' : 'none';
 
     this.game.audio.playMusic('victory');
     this.startConfetti();
@@ -179,9 +178,7 @@ class VictoryScreen extends BaseScreen {
 
   async nextLevel() {
     this.game.audio.click();
-    /* deferred interstitial (decided in endRun): plays on the way to the
-       next level, never while the victory screen is appearing */
-    if (typeof SDK !== 'undefined' && SDK.isAvailable() && this.lastData && this.lastData.adNext) {
+    if (typeof SDK !== 'undefined' && this.lastData && this.lastData.adNext) {
       await SDK.showInterstitial();
     }
     this.game.show(this.game.config.playTarget || 'gameplay');
@@ -189,7 +186,7 @@ class VictoryScreen extends BaseScreen {
 
   async doubleCoins() {
     if (this.doubleUsed || !this.lastData) return;
-    if (typeof SDK === 'undefined' || !SDK.isAvailable()) return;
+    if (typeof SDK === 'undefined') return;
     this.game.audio.click();
     const state = await SDK.showRewarded();
     if (state === 'rewarded') {

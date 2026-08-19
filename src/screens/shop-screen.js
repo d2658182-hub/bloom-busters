@@ -137,7 +137,7 @@ class ShopScreen extends BaseScreen {
 
   async watchAd(item, button) {
     if (this.game.hasItem(item.id)) return;
-    if (typeof SDK === 'undefined' || !SDK.isAvailable()) return;
+    if (typeof SDK === 'undefined') return;
     this.game.audio.click();
     const state = await SDK.showRewarded();
     if (state === 'rewarded') {

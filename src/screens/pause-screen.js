@@ -36,7 +36,7 @@ class PauseScreen extends BaseScreen {
   }
 
   enter() {
-    if (typeof SDK !== 'undefined') SDK.gameplayPause();
+    if (typeof SDK !== 'undefined') SDK.levelMessage('level_paused');
     /* duck the music (soft, still playing) instead of cutting it: no
        jarring stop/restart when resuming */
     this.game.audio.setDuck(0.14);

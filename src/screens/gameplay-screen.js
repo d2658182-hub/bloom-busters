@@ -421,10 +421,9 @@ class GameplayScreen extends BaseScreen {
 
     /* auto-pause when the platform pauses (bridge onPause) */
     if (typeof SDK !== 'undefined') {
-      const offPause = SDK.onPause(() => {
+      SDK.onPause(() => {
         if (this.frameId) this.pause();
       });
-      this.cleanups.push(offPause);
     }
   }
 
@@ -494,8 +493,8 @@ class GameplayScreen extends BaseScreen {
     }
 
     if (typeof SDK !== 'undefined') {
-      if (options.resume) SDK.gameplayResume();
-      else SDK.gameplayStart();
+      if (options.resume) SDK.levelMessage('level_resumed');
+      else SDK.levelMessage('level_started');
     }
     this.game.audio.playMusic('gameplay');
     this.lastTime = 0;
@@ -506,7 +505,7 @@ class GameplayScreen extends BaseScreen {
   exit(next) {
     cancelAnimationFrame(this.frameId);
     this.frameId = null;
-    if (typeof SDK !== 'undefined') SDK.gameplayPause();
+    if (typeof SDK !== 'undefined') SDK.levelMessage('level_paused');
     /* going to the pause screen: keep the music playing (it gets ducked
        by PauseScreen.enter) so resuming never cuts/restarts it */
     if (!next || next.name !== 'pause') {
@@ -532,7 +531,7 @@ class GameplayScreen extends BaseScreen {
     state.phase = won ? 'won' : 'lost';
 
     const streak = this.game.pushStreak(won ? 'win' : 'loss');
-    const adNext = typeof SDK !== 'undefined' && SDK.isAvailable() && streak >= 2 && streak % 2 === 0;
+    const adNext = typeof SDK !== 'undefined' && streak >= 2 && streak % 2 === 0;
     if (adNext) this.game.resetStreak();
 
     const stars = won ? this.computeStars() : 0;
@@ -551,8 +550,8 @@ class GameplayScreen extends BaseScreen {
     this.game.addCoins(data.coins);
     if (won) this.game.setLevel(state.level + 1);
 
-    if (won && typeof SDK !== 'undefined') SDK.gameplayStop();
-    if (!won && typeof SDK !== 'undefined') SDK.gameplayFail();
+    if (won && typeof SDK !== 'undefined') SDK.levelMessage('level_completed');
+    if (!won && typeof SDK !== 'undefined') SDK.levelMessage('level_failed');
 
     this.game.show(won ? 'victory' : 'gameover', { data, resumeState: won ? null : this.snapshot() });
     this.state = null;

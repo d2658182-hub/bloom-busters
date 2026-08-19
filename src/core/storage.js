@@ -46,7 +46,7 @@ class Storage {
   /* Pull cloud values at boot and merge into local.
      Called once; never blocks the game. */
   pullFromCloud() {
-    if (this.cloudLoaded || typeof SDK === 'undefined' || !SDK.isAvailable()) return;
+    if (this.cloudLoaded || typeof SDK === 'undefined') return;
     this.cloudLoaded = true;
     const keys = ['coins', 'level', 'items', 'settings', 'streak', 'runStats', 'hintsUsed', 'reviveUsed', 'bestCombo', 'stars'];
     keys.forEach((key) => {

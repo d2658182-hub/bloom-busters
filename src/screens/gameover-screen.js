@@ -73,7 +73,6 @@ class GameOverScreen extends BaseScreen {
     if (coins) coins.textContent = (data.coins || 0).toLocaleString('en-US');
 
     const canRevive = typeof SDK !== 'undefined'
-      && SDK.isAvailable()
       && options.resumeState
       && !options.resumeState.reviveUsed;
     if (this.reviveButton) {
@@ -87,7 +86,7 @@ class GameOverScreen extends BaseScreen {
     this.game.audio.click();
     /* deferred interstitial (decided in endRun): plays on the way to the
        next run, never while the game over screen is appearing */
-    if (typeof SDK !== 'undefined' && SDK.isAvailable()
+    if (typeof SDK !== 'undefined'
         && this.lastOptions && this.lastOptions.data && this.lastOptions.data.adNext) {
       await SDK.showInterstitial();
     }
@@ -96,7 +95,7 @@ class GameOverScreen extends BaseScreen {
 
   async revive() {
     if (!this.lastOptions || !this.lastOptions.resumeState) return;
-    if (typeof SDK === 'undefined' || !SDK.isAvailable()) return;
+    if (typeof SDK === 'undefined') return;
     this.game.audio.click();
     const state = await SDK.showRewarded();
     if (state === 'rewarded') {
