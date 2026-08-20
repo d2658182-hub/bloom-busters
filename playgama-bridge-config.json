@@ -1,0 +1,28 @@
+{
+  "advertisement": {
+    "minimumDelayBetweenInterstitial": 60,
+    "initialInterstitialDelay": 0,
+    "interstitial": {
+      "disable": false,
+      "preloadOnStart": "level_completed",
+      "placementFallback": "level_completed",
+      "placements": [
+        { "id": "level_completed" },
+        { "id": "game_over" }
+      ]
+    },
+    "rewarded": {
+      "disable": false,
+      "preloadOnStart": "revive",
+      "placementFallback": "revive",
+      "placements": [
+        { "id": "revive" },
+        { "id": "double_coins" },
+        { "id": "shop_bloom-bonus" },
+        { "id": "shop_double" },
+        { "id": "shop_mega-seeds" },
+        { "id": "shop_extra-heart" }
+      ]
+    }
+  }
+}
