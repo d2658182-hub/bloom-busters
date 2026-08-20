@@ -101,7 +101,14 @@ class VictoryScreen extends BaseScreen {
       img.src = i < data.stars ? 'assets/ui/s1.png' : 'assets/ui/s2.png';
     });
 
-    if (this.doubleButton) this.doubleButton.el.style.display = typeof SDK !== 'undefined' ? '' : 'none';
+    if (this.doubleButton) {
+      this.doubleButton.el.style.display = 'none';
+      if (typeof SDK !== 'undefined' && SDK.rewardedSupported) {
+        SDK.rewardedSupported().then((supported) => {
+          if (this.doubleButton && this.el) this.doubleButton.el.style.display = supported ? '' : 'none';
+        });
+      }
+    }
 
     this.game.audio.playMusic('victory');
     this.startConfetti();
@@ -176,11 +183,8 @@ class VictoryScreen extends BaseScreen {
     this.confettiFrame = requestAnimationFrame(step);
   }
 
-  async nextLevel() {
+  nextLevel() {
     this.game.audio.click();
-    if (typeof SDK !== 'undefined' && this.lastData && this.lastData.adNext) {
-      await SDK.showInterstitial();
-    }
     this.game.show(this.game.config.playTarget || 'gameplay');
   }
 
@@ -188,7 +192,7 @@ class VictoryScreen extends BaseScreen {
     if (this.doubleUsed || !this.lastData) return;
     if (typeof SDK === 'undefined') return;
     this.game.audio.click();
-    const state = await SDK.showRewarded();
+    const state = await SDK.showRewarded('double_coins');
     if (state === 'rewarded') {
       this.doubleUsed = true;
       const bonus = this.lastData.coins || 0;

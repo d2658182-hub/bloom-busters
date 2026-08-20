@@ -76,20 +76,19 @@ class GameOverScreen extends BaseScreen {
       && options.resumeState
       && !options.resumeState.reviveUsed;
     if (this.reviveButton) {
-      this.reviveButton.el.style.display = canRevive ? '' : 'none';
+      this.reviveButton.el.style.display = 'none';
+      if (canRevive && SDK.rewardedSupported) {
+        SDK.rewardedSupported().then((supported) => {
+          if (this.reviveButton && this.el) this.reviveButton.el.style.display = supported ? '' : 'none';
+        });
+      }
     }
 
     this.game.audio.playMusic('gameover');
   }
 
-  async retry() {
+  retry() {
     this.game.audio.click();
-    /* deferred interstitial (decided in endRun): plays on the way to the
-       next run, never while the game over screen is appearing */
-    if (typeof SDK !== 'undefined'
-        && this.lastOptions && this.lastOptions.data && this.lastOptions.data.adNext) {
-      await SDK.showInterstitial();
-    }
     this.game.show(this.game.config.playTarget || 'gameplay');
   }
 
@@ -97,7 +96,7 @@ class GameOverScreen extends BaseScreen {
     if (!this.lastOptions || !this.lastOptions.resumeState) return;
     if (typeof SDK === 'undefined') return;
     this.game.audio.click();
-    const state = await SDK.showRewarded();
+    const state = await SDK.showRewarded('revive');
     if (state === 'rewarded') {
       this.game.audio.confirm();
       this.game.show('gameplay', { resumeState: this.lastOptions.resumeState });

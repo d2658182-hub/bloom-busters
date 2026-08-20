@@ -18,17 +18,6 @@ class AudioEngine {
     const saved = game.storage.get('settings', null);
     if (saved) Object.assign(this.settings, saved);
 
-    // respect the platform audio state when the bridge provides one
-    if (typeof SDK !== 'undefined') {
-      const platformAudio = SDK.isAudioEnabled;
-      if (platformAudio !== null && platformAudio === false) this.settings.sound = false;
-      const offAudio = SDK.onAudio((enabled) => {
-        this.settings.sound = !!enabled;
-        if (!enabled) this.stopMusic();
-      });
-      window.addEventListener('beforeunload', offAudio, { once: true });
-    }
-
     /* never keep playing when the tab/browser is hidden or closed */
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {

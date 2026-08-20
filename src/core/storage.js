@@ -1,65 +1,84 @@
+/* Progress persistence.
+   Bridge Storage is authoritative on Playgama. localStorage is only an
+   offline fallback when the Bridge CDN is unavailable. */
+
 class Storage {
   constructor(gameId) {
     this.prefix = `gt_${gameId}_`;
-    this.cloudLoaded = false;
+    this.cache = Object.create(null);
+    this.bridgeActive = false;
+    this.readyPromise = null;
   }
 
-  key(name) {
-    return this.prefix + name;
+  key(name) { return this.prefix + name; }
+
+  parse(raw, fallback = null) {
+    if (raw === null || raw === undefined || raw === '') return fallback;
+    try { return JSON.parse(raw); } catch (error) { return raw; }
   }
 
-  /* local (fast, source of truth) */
-  getLocal(key, fallback = null) {
+  readOffline(key, fallback) {
     try {
-      const value = localStorage.getItem(this.key(key));
-      return value === null ? fallback : JSON.parse(value);
+      const raw = localStorage.getItem(this.key(key));
+      return raw === null ? fallback : this.parse(raw, fallback);
     } catch (error) {
       return fallback;
     }
   }
 
-  setLocal(key, value) {
-    try {
-      localStorage.setItem(this.key(key), JSON.stringify(value));
-    } catch (error) {
-      /* storage unavailable */
-    }
+  writeOffline(key, value) {
+    try { localStorage.setItem(this.key(key), JSON.stringify(value)); } catch (error) { /* unavailable */ }
   }
 
-  /* public API — local first, then mirror to cloud (bridge.storage) */
   get(key, fallback = null) {
-    return this.getLocal(key, fallback);
+    return Object.prototype.hasOwnProperty.call(this.cache, key) ? this.cache[key] : fallback;
   }
 
   set(key, value) {
-    this.setLocal(key, value);
-    this.mirrorToCloud(key);
+    this.cache[key] = value;
+    if (this.bridgeActive && typeof SDK !== 'undefined') {
+      SDK.storageSet(this.key(key), JSON.stringify(value));
+    } else if (!this.readyPromise) {
+      this.writeOffline(key, value);
+    }
   }
 
-  /* ---- cloud mirroring (defensive: never throws, async best-effort) ---- */
-  mirrorToCloud(key) {
-    if (typeof SDK === 'undefined') return;
-    const value = this.getLocal(key, null);
-    SDK.storageSet(this.key(key), value === null ? '' : JSON.stringify(value)).catch(() => {});
-  }
-
-  /* Pull cloud values at boot and merge into local.
-     Called once; never blocks the game. */
-  pullFromCloud() {
-    if (this.cloudLoaded || typeof SDK === 'undefined') return;
-    this.cloudLoaded = true;
-    const keys = ['coins', 'level', 'items', 'settings', 'streak', 'runStats', 'hintsUsed', 'reviveUsed', 'bestCombo', 'stars'];
-    keys.forEach((key) => {
-      SDK.storageGet(this.key(key)).then((raw) => {
-        if (raw == null || raw === '') return;
-        try {
-          const parsed = JSON.parse(raw);
-          // only adopt if the local value is missing (fresh device)
-          if (this.getLocal(key, null) === null) this.setLocal(key, parsed);
-        } catch (error) {
-          /* ignore malformed cloud value */
+  init() {
+    if (this.readyPromise) return this.readyPromise;
+    const keys = ['coins', 'level', 'items', 'settings', 'streak', 'runStats',
+      'hintsUsed', 'reviveUsed', 'bestCombo', 'stars'];
+    this.readyPromise = (typeof SDK !== 'undefined' && SDK.available
+      ? SDK.available()
+      : Promise.resolve(false))
+      .then((available) => {
+        this.bridgeActive = !!available;
+        if (this.bridgeActive) {
+          return Promise.all(keys.map((key) =>
+            SDK.storageGet(this.key(key)).then((raw) => ({ key, raw }))
+          )).then((values) => {
+            values.forEach(({ key, raw }) => {
+              const value = this.parse(raw, null);
+              if (value !== null && value !== undefined) this.cache[key] = value;
+            });
+            return true;
+          });
         }
-      }).catch(() => {});
-    });
+        keys.forEach((key) => {
+          const value = this.readOffline(key, null);
+          if (value !== null && value !== undefined) this.cache[key] = value;
+        });
+        return false;
+      })
+      .catch(() => {
+        this.bridgeActive = false;
+        keys.forEach((key) => {
+          const value = this.readOffline(key, null);
+          if (value !== null && value !== undefined) this.cache[key] = value;
+        });
+        return false;
+      });
+    return this.readyPromise;
   }
+
+  pullFromCloud() { return this.init(); }
 }

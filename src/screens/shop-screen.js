@@ -69,6 +69,8 @@ class ShopScreen extends BaseScreen {
           variant: 'back',
           onClick: () => this.watchAd(item, adButton)
         });
+        adButton.el.classList.add('btn-ad');
+        adButton.el.title = `Watch an ad to get ${item.name}`;
         actions.appendChild(adButton.el);
       }
       row.appendChild(actions);
@@ -88,6 +90,11 @@ class ShopScreen extends BaseScreen {
   enter() {
     this.game.audio.playMusic('menu');
     this.refreshAll();
+    if (typeof SDK !== 'undefined' && SDK.rewardedSupported) {
+      SDK.rewardedSupported().then((supported) => {
+        if (this.el) this.el.querySelectorAll('.btn-ad').forEach((button) => { button.hidden = !supported; });
+      });
+    }
   }
 
   getCoins() {
@@ -139,7 +146,7 @@ class ShopScreen extends BaseScreen {
     if (this.game.hasItem(item.id)) return;
     if (typeof SDK === 'undefined') return;
     this.game.audio.click();
-    const state = await SDK.showRewarded();
+    const state = await SDK.showRewarded(`shop_${item.id}`);
     if (state === 'rewarded') {
       this.game.addItem(item.id);
       this.game.audio.confirm();

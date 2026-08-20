@@ -419,12 +419,6 @@ class GameplayScreen extends BaseScreen {
       if (event.code === 'Escape' || event.code === 'KeyP') this.pause();
     });
 
-    /* auto-pause when the platform pauses (bridge onPause) */
-    if (typeof SDK !== 'undefined') {
-      SDK.onPause(() => {
-        if (this.frameId) this.pause();
-      });
-    }
   }
 
   helpHtml() {
@@ -521,7 +515,12 @@ class GameplayScreen extends BaseScreen {
 
   pause() {
     this.game.audio.click();
-    this.game.show('pause');
+    this.pauseFromPlatform();
+  }
+
+  pauseFromPlatform() {
+    if (!this.state || !this.frameId) return;
+    this.game.show('pause', { platform: true });
   }
 
   /* ---------------- SDK + end-of-run ---------------- */
@@ -550,8 +549,11 @@ class GameplayScreen extends BaseScreen {
     this.game.addCoins(data.coins);
     if (won) this.game.setLevel(state.level + 1);
 
-    if (won && typeof SDK !== 'undefined') SDK.levelMessage('level_completed');
-    if (!won && typeof SDK !== 'undefined') SDK.levelMessage('level_failed');
+    if (won && typeof SDK !== 'undefined') SDK.levelMessage('level_completed', { level: String(state.level) });
+    if (!won && typeof SDK !== 'undefined') SDK.levelMessage('level_failed', { level: String(state.level) });
+    if (adNext && typeof SDK !== 'undefined') {
+      SDK.showInterstitial(won ? 'level_completed' : 'game_over');
+    }
 
     this.game.show(won ? 'victory' : 'gameover', { data, resumeState: won ? null : this.snapshot() });
     this.state = null;

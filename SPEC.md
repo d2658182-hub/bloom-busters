@@ -117,8 +117,8 @@
   1. GAME OVER → REVIVE (reprend EXACTEMENT où on était, 1×/run).
   2. VICTORY → DOUBLE COINS (sinon garder la base, jamais la retirer).
   3. SHOP → WATCH AD sur ≥ 50 % des items.
-- **Stockage :** `bridge.storage` (cloud) tiré au boot puis re-mirroré à chaque écriture,
-  repli `localStorage`.
+- **Stockage :** `bridge.storage` est la source de vérité et est chargé avant le
+  premier écran jouable ; repli `localStorage` uniquement hors Bridge.
 - **Modération :** ZIP index.html racine ≤ 300 MB, titre anglais, pubs uniquement via le
   bridge (zéro tierce, zéro lien sortant, zéro appel réseau externe), rewarded opt-in
   clair avec récompense annoncée, son + gameplay en pause pendant une pub plein écran,
